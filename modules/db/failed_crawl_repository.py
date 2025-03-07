@@ -17,7 +17,7 @@ class FailedCrawlRepository(SQLiteRepository):
             url TEXT NOT NULL,
             type TEXT NOT NULL,
             error TEXT,
-            foreign_id INTEGER NOT NULL,
+            foreign_id INTEGER,
             status TEXT
         )
         """
