@@ -8,6 +8,7 @@ default:
 x2j input output:
     python {{utils}}/xml_to_json.py {{input}} {{output}}
 
+[group: 'conversion']
 imgcv input output:
     python {{utils}}/image_converter.py {{input}} {{output}}
 
@@ -28,5 +29,9 @@ test:
     pytest
 
 [group: 'utility']
-clean:
+clean-cache:
     rm -rf __pycache__ *.pyc .pytest_cache
+
+[group: 'utility']
+db-wipe:
+    rm data/crawler.db
