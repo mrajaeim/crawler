@@ -15,7 +15,7 @@ class ProductRepository(SQLiteRepository):
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
-            price INTEGER NOT NULL,
+            price TEXT NOT NULL,
             sales_price INTEGER,
             category TEXT,
             short_desc TEXT,
@@ -25,7 +25,7 @@ class ProductRepository(SQLiteRepository):
         """
         self.execute(query)
 
-    def create_product(self, title: str, price: float, sales_price: float, category: str, short_desc: str, brand: str,
+    def create_product(self, title: str, price: str, sales_price: str, category: str, short_desc: str, brand: str,
                        url: str) -> int:
         """Create a new product and return its ID."""
         query = """
