@@ -34,4 +34,15 @@ clean-cache:
 
 [group: 'utility']
 db-wipe:
-    rm data/crawler.db
+    rm data/crawler.db -f
+    @echo "DB wiped!"
+
+[group: 'utility']
+img-wipe:
+    rm data/images -rf
+    @echo "Images wiped!"
+
+
+[group: 'utility']
+wipe: db-wipe img-wipe
+    @echo "All gathered data wiped!"
