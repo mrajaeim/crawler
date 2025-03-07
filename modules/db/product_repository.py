@@ -40,6 +40,11 @@ class ProductRepository(SQLiteRepository):
         query = "SELECT * FROM products WHERE id = ?"
         return self.fetch_one(query, (product_id,))
 
+    def get_product_by_url(self, product_url: str) -> Optional[Dict[str, Any]]:
+        """Fetch a product by its ID."""
+        query = "SELECT * FROM products WHERE url = ?"
+        return self.fetch_one(query, (product_url,))
+
     def update_product(self, product_id: int, **kwargs) -> None:
         """Update a product's fields."""
         if not kwargs:
