@@ -1,12 +1,15 @@
 just := if os_family() == "windows" { "rust-just" } else { "just" }
 utils := "./modules/utils"
-# Default help message
+
 default:
     {{just}} --list
 
 [group: 'conversion']
 x2j input output:
     python {{utils}}/xml_to_json.py {{input}} {{output}}
+
+imgcv input output:
+    python {{utils}}/image_converter.py {{input}} {{output}}
 
 [group: 'development']
 install:
