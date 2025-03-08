@@ -1,6 +1,7 @@
 import json
 import logging
 from bs4 import BeautifulSoup
+from modules.utils.safely_parse_json_string import normalize_json_string
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +32,7 @@ class ArtisankalaSimpleProductExtractor:
         ld_json = soup.find('script', type='application/ld+json')
         if ld_json:
             try:
-                ld_data = json.loads(ld_json.string)
+                ld_data = normalize_json_string(ld_json.string)
                 if ld_data.get('@type') == 'Product':
                     product_data['product_name'] = ld_data.get('name')
                     product_data['product_id'] = ld_data.get('productID')
@@ -45,9 +46,9 @@ class ArtisankalaSimpleProductExtractor:
                         product_data['brand'] = brand.get('name')
 
                     # Extract price
-                    offers = ld_data.get('offers')
-                    if offers and isinstance(offers, dict):
-                        product_data['product_price'] = offers.get('price')
+                    # offers = ld_data.get('offers')
+                    # if offers and isinstance(offers, dict):
+                        # product_data['product_price'] = offers.get('price')
             except (json.JSONDecodeError, AttributeError) as e:
                 logging.warning(f"Error parsing JSON-LD: {str(e)}")
 

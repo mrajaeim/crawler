@@ -107,10 +107,13 @@ class ProductCrawler:
     def _save_product_to_db(self, product_data):
         """Save product data to the database"""
         try:
-            # Format price - remove currency symbol and commas, convert to float
-            price = formatters.format_price(product_data['product_price'])
-            sales_price = formatters.format_price(product_data['product_old_price']) if product_data[
+            current_price = formatters.format_price(product_data['product_price'])
+            old_price = formatters.format_price(product_data['product_old_price']) if product_data[
                 'product_old_price'] else None
+
+            has_sales_price = current_price != old_price and old_price is not None
+            price = current_price if not has_sales_price else old_price
+            sales_price = current_price if has_sales_price else None
 
             # Create product in database
             product_id = product_repo.create_product(
