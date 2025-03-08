@@ -1,12 +1,23 @@
-from playwright.sync_api import sync_playwright
+import logging
+from product_crawler import crawl_urls
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("crawler.log"),
+        logging.StreamHandler()
+    ]
+)
 
 def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        page.goto("https://google.com")
-        print(page.title())
-        browser.close()
+    """Main entry point for the crawler application"""
+    urls = [
+        "https://artisankala.com/%D9%84%D9%85%D9%8A%D9%86%D8%AA-cs7"
+    ]
+    if urls:
+        crawl_urls(urls)
 
 if __name__ == "__main__":
     main()
