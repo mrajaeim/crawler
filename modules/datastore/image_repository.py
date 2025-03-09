@@ -48,6 +48,18 @@ class ImageRepository(SQLiteRepository):
         query = "SELECT * FROM images WHERE id = ?"
         return self.fetch_one(query, (image_id,))
 
+    def get_image_by_url(self, image_url: str) -> Optional[Dict[str, Any]]:
+        """Fetch an image by its URL.
+        
+        Args:
+            image_url: The URL of the image
+            
+        Returns:
+            The image record if found, None otherwise
+        """
+        query = "SELECT * FROM images WHERE image_url = ?"
+        return self.fetch_one(query, (image_url,))
+
     def update_image(self, image_id: int, **kwargs) -> None:
         """Update an image's fields."""
         if not kwargs:
@@ -77,7 +89,7 @@ class ImageRepository(SQLiteRepository):
         else:
             query = "SELECT * FROM images WHERE product_id = ?"
             return self.fetch_all(query, (product_id,))
-            
+
     def get_images_by_variation_id(self, variation_id: int) -> List[Dict[str, Any]]:
         """Fetch all images associated with a product variation."""
         query = "SELECT * FROM images WHERE variation_id = ?"
