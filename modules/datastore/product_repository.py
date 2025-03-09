@@ -16,23 +16,26 @@ class ProductRepository(SQLiteRepository):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             price TEXT NOT NULL,
-            sales_price INTEGER,
+            sales_price TEXT,
             category TEXT,
             short_desc TEXT,
             brand TEXT,
-            url TEXT NOT NULL UNIQUE
+            url TEXT NOT NULL UNIQUE,
+            has_variations BOOLEAN DEFAULT 0,
+            parent_id INTEGER,
+            FOREIGN KEY (parent_id) REFERENCES products (id) ON DELETE CASCADE
         )
         """
         self.execute(query)
 
     def create_product(self, title: str, price: str, sales_price: str, category: str, short_desc: str, brand: str,
-                       url: str) -> int:
+                       url: str, has_variations: bool = False, parent_id: Optional[int] = None) -> int:
         """Create a new product and return its ID."""
         query = """
-        INSERT INTO products (title, price, sales_price, category, short_desc, brand, url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (title, price, sales_price, category, short_desc, brand, url, has_variations, parent_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        self.execute(query, (title, price, sales_price, category, short_desc, brand, url))
+        self.execute(query, (title, price, sales_price, category, short_desc, brand, url, has_variations, parent_id))
         return self.cursor.lastrowid
 
     def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
@@ -41,7 +44,7 @@ class ProductRepository(SQLiteRepository):
         return self.fetch_one(query, (product_id,))
 
     def get_product_by_url(self, product_url: str) -> Optional[Dict[str, Any]]:
-        """Fetch a product by its ID."""
+        """Fetch a product by its URL."""
         query = "SELECT * FROM products WHERE url = ?"
         return self.fetch_one(query, (product_url,))
 
@@ -62,3 +65,19 @@ class ProductRepository(SQLiteRepository):
         """Fetch all products."""
         query = "SELECT * FROM products"
         return self.fetch_all(query)
+        
+    def get_product_variations(self, parent_id: int) -> List[Dict[str, Any]]:
+        """Fetch all variations of a parent product."""
+        query = """
+        SELECT p.*, v.variation_code, i.image_url 
+        FROM products p
+        JOIN product_variations v ON p.id = v.product_id
+        LEFT JOIN images i ON v.image_id = i.id
+        WHERE p.parent_id = ?
+        """
+        return self.fetch_all(query, (parent_id,))
+        
+    def mark_product_has_variations(self, product_id: int, has_variations: bool = True) -> None:
+        """Mark a product as having variations."""
+        query = "UPDATE products SET has_variations = ? WHERE id = ?"
+        self.execute(query, (has_variations, product_id))

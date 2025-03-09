@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import time
+
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
@@ -8,6 +10,7 @@ from urllib.parse import urlparse
 from modules.db import product_repo, image_repo, failed_crawl_repo
 from modules.utils import formatters
 from modules.utils.incremental_id_generator import IncrementalIdGenerator
+from modules.datastore.variation_repository import VariationRepository
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +33,7 @@ class ProductCrawler:
         self.context = None
         self.page = None
         self.untitled_image_id_generator = IncrementalIdGenerator()
+        self.variation_repo = VariationRepository("data/crawler.db")
 
     def initialize(self):
         """Initialize the Playwright browser"""
@@ -43,8 +47,14 @@ class ProductCrawler:
         if self.browser:
             self.browser.close()
 
-    def not_crawled_before(self, url):
-        return not product_repo.get_product_by_url(url)
+    def not_crawled_before(self, url, url_type="product"):
+        match url_type:
+            case "image":
+                return not image_repo.get_image_by_url(url)
+            case "product":
+                return not product_repo.get_product_by_url(url)
+            case _:
+                raise ValueError(f"Unsupported url type: {url_type}")
 
     def crawl_url(self, url):
         """Crawl a specific URL and extract product information"""
@@ -101,7 +111,8 @@ class ProductCrawler:
 
     def extract_product_data(self, soup: BeautifulSoup):
         """Extract product data from the BeautifulSoup object"""
-        from modules.extractors.artisankala_simple_product_extractor import ArtisankalaSimpleProductExtractor as ASPExtractor
+        from modules.extractors.artisankala_simple_product_extractor import \
+            ArtisankalaSimpleProductExtractor as ASPExtractor
         return ASPExtractor.extract(soup)
 
     def _save_product_to_db(self, product_data):
@@ -115,6 +126,9 @@ class ProductCrawler:
             price = current_price if not has_sales_price else old_price
             sales_price = current_price if has_sales_price else None
 
+            # Check if product has variations
+            has_variations = product_data.get('has_variations', False)
+
             # Create product in database
             product_id = product_repo.create_product(
                 title=product_data['product_name'] or '',
@@ -123,12 +137,18 @@ class ProductCrawler:
                 category=product_data['category'] or '',
                 short_desc=product_data['description'] or '',
                 brand=product_data['brand'] or '',
-                url=product_data['product_url']
+                url=product_data['product_url'],
+                has_variations=has_variations
             )
 
-            # Save image if available
-            if product_data['product_image_url']:
+            # Save main product image if available
+            if product_data['product_image_url'] and self.not_crawled_before(product_data['product_image_url'],
+                                                                             url_type="image"):
                 self._save_image(product_id, product_data['product_image_url'])
+
+            # Process variations if present
+            if has_variations and product_data.get('variations'):
+                self._process_variations(product_id, product_data['variations'])
 
             logging.info(f"Successfully saved product ID: {product_id}")
             return product_id
@@ -143,6 +163,39 @@ class ProductCrawler:
                 status="failed"
             )
             return None
+
+    def _process_variations(self, parent_product_id, variations):
+        """Process and save product variations"""
+        logging.info(f"Processing {len(variations)} variations for product {parent_product_id}")
+
+        for variation in variations:
+            try:
+                # Create variation record
+                variation_id = self.variation_repo.create_variation(
+                    product_id=parent_product_id,
+                    variation_code=variation['code']
+                )
+
+                # Save variation image
+                if variation['image_url'] and self.not_crawled_before(variation['image_url'], url_type="image"):
+                    image_id = self._save_variation_image(
+                        product_id=parent_product_id,
+                        variation_id=variation_id,
+                        image_url=variation['image_url']
+                    )
+
+                    # Update variation with image ID
+                    if image_id:
+                        self.variation_repo.update_variation(
+                            variation_id=variation_id,
+                            image_id=image_id
+                        )
+
+                logging.info(
+                    f"Saved variation {variation['code']} (ID: {variation_id}) for product {parent_product_id}")
+
+            except Exception as e:
+                logging.error(f"Error saving variation {variation['code']} for product {parent_product_id}: {str(e)}")
 
     def _save_image(self, product_id, image_url):
         """Download and save image, then record in database"""
@@ -164,8 +217,9 @@ class ProductCrawler:
                         f.write(chunk)
 
                 # Save image record in database
-                image_repo.create_image(product_id, image_url)
+                image_id = image_repo.create_image(product_id, image_url)
                 logging.info(f"Saved image for product {product_id}: {image_path}")
+                return image_id
             else:
                 raise Exception(f"Failed to download image: HTTP {response.status_code}")
 
@@ -178,6 +232,50 @@ class ProductCrawler:
                 foreign_id=product_id,
                 status="failed"
             )
+            return None
+
+    def _save_variation_image(self, product_id, variation_id, image_url):
+        """Download and save variation image, then record in database"""
+        try:
+            # Generate filename from URL
+            parsed_url = urlparse(image_url)
+            filename = os.path.basename(parsed_url.path)
+            if not filename:
+                filename = f"variation_{variation_id}_image.jpg"
+
+            # Create full path
+            image_path = os.path.join(IMAGES_DIR, filename)
+
+            # Download image
+            response = requests.get(image_url, stream=True)
+            if response.status_code == 200:
+                with open(image_path, 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+
+                # Save image record in database with variation type
+                image_id = image_repo.create_image(
+                    product_id=product_id,
+                    image_url=image_url,
+                    image_type='variation',
+                    variation_id=variation_id
+                )
+
+                logging.info(f"Saved variation image for product {product_id}, variation {variation_id}: {image_path}")
+                return image_id
+            else:
+                raise Exception(f"Failed to download variation image: HTTP {response.status_code}")
+
+        except Exception as e:
+            logging.error(f"Error saving variation image for product {product_id}, variation {variation_id}: {str(e)}")
+            failed_crawl_repo.create_failed_crawl(
+                url=image_url,
+                type="variation_image",
+                error=str(e),
+                foreign_id=variation_id,
+                status="failed"
+            )
+            return None
 
 
 def crawl_urls(urls):
@@ -188,5 +286,6 @@ def crawl_urls(urls):
     for url in urls:
         if crawler.not_crawled_before(url):
             crawler.crawl_url(url)
+            time.sleep(0.2)
 
     crawler.close()

@@ -25,7 +25,9 @@ class ArtisankalaSimpleProductExtractor:
             'product_image_url': None,
             'category': None,
             'description': None,
-            'sku': None
+            'sku': None,
+            'has_variations': False,
+            'variations': []
         }
 
         # Try to extract from structured data first (most reliable)
@@ -102,5 +104,37 @@ class ArtisankalaSimpleProductExtractor:
 
             if categories:
                 product_data['category'] = ' > '.join(categories)
+                
+        # Check for product variations
+        variations_container = soup.find('div', {'class': 'km--products_container'})
+        if variations_container:
+            product_data['has_variations'] = True
+            
+            # Extract variations
+            variation_items = variations_container.find_all('span', {'class': 'km-item'})
+            for item in variation_items:
+                variation = {
+                    'code': None,
+                    'image_url': None,
+                    'id': None
+                }
+                
+                # Extract variation code
+                code_span = item.find('span', {'class': 'km-title'})
+                if code_span:
+                    variation['code'] = code_span.text.strip()
+                
+                # Extract variation image
+                img = item.find('img', {'class': 'km-img'})
+                if img:
+                    variation['image_url'] = img.get('src')
+                
+                # Extract variation ID
+                variation['id'] = item.get('km-id')
+                
+                if variation['code'] and variation['image_url']:
+                    product_data['variations'].append(variation)
+            
+            logging.info(f"Found {len(product_data['variations'])} variations for product")
 
         return product_data
