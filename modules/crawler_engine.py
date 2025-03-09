@@ -34,6 +34,7 @@ class CrawlerEngine:
         # Stats tracking
         self.stats = {
             "total_urls": 0,
+            "processed_urls": 0,  # Count of all URLs processed (attempt made)
             "successful_crawls": 0,
             "failed_crawls": 0,
             "skipped_urls": 0,
@@ -72,12 +73,13 @@ class CrawlerEngine:
         try:
             self.initialize()
             
-            # Limit number of URLs to crawl
-            urls_to_crawl = urls[:self.max_urls]
-            if len(urls) > self.max_urls:
-                logging.info(f"Limiting crawl to first {self.max_urls} URLs out of {len(urls)}")
-            
-            for url in urls_to_crawl:
+            # Process URLs until we reach max_urls processed (not just attempted)
+            for url in urls:
+                # Check if we've reached the maximum number of URLs to process
+                if self.stats["processed_urls"] >= self.max_urls:
+                    logging.info(f"Reached maximum URLs to process: {self.max_urls}")
+                    break
+                
                 # Check if URL is marked as non-crawlable
                 if self.crawler_service.is_non_crawlable_url(url):
                     self.stats["non_crawlable_urls"] += 1
@@ -87,7 +89,9 @@ class CrawlerEngine:
                 # Check if URL has been crawled before
                 if self.crawler_service.not_crawled_before(url):
                     # Crawl the URL
-                    result = self.crawler_service.crawl_url(url)
+                    # Increment the processed URLs counter
+                    self.stats["processed_urls"] += 1
+                    result = self.crawler_service.crawl_url(url, self.stats["processed_urls"])
                     
                     if result is not None:
                         self.stats["successful_crawls"] += 1
@@ -132,7 +136,8 @@ class CrawlerEngine:
     def _log_summary(self) -> None:
         """Log crawling statistics summary"""
         logging.info("=== Crawling Summary ===")
-        logging.info(f"Total URLs: {self.stats['total_urls']}")
+        logging.info(f"Total URLs in queue: {self.stats['total_urls']}")
+        logging.info(f"URLs processed: {self.stats['processed_urls']} (max: {self.max_urls})")
         logging.info(f"Successful crawls: {self.stats['successful_crawls']}")
         logging.info(f"Failed crawls: {self.stats['failed_crawls']}")
         logging.info(f"Skipped URLs (already crawled): {self.stats['skipped_urls']}")

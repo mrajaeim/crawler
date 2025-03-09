@@ -63,7 +63,7 @@ class ProductCrawler(CrawlerInterface):
         non_crawlable_url_repo.create_non_crawlable_url(url, url_type, reason)
         logging.info(f"Added URL to non-crawlable list: {url} (Type: {url_type}, Reason: {reason})")
 
-    def crawl_url(self, url):
+    def crawl_url(self, url, url_number):
         """Crawl a specific URL and extract product information"""
         try:
             # Check if URL is marked as non-crawlable
@@ -71,7 +71,7 @@ class ProductCrawler(CrawlerInterface):
                 logging.info(f"Skipping non-crawlable URL: {url}")
                 return None
 
-            logging.info(f"Crawling URL: {url}")
+            logging.info(f"{url_number:04} Crawling URL: {url}")
             self.page.goto(url, wait_until="networkidle")
 
             # Get the page content

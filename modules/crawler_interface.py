@@ -35,12 +35,13 @@ class CrawlerInterface(ABC):
         pass
     
     @abstractmethod
-    def crawl_url(self, url: str) -> Optional[Union[str, int]]:
+    def crawl_url(self, url: str, url_number: int) -> Optional[Union[str, int]]:
         """
         Crawl a specific URL and process its content
         
         Args:
             url: The URL to crawl
+            url_number: The number of current url
             
         Returns:
             Optional ID of the processed item or None if crawling failed

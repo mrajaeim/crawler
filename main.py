@@ -36,8 +36,9 @@ def main():
         
         # Print summary
         print("\nCrawling completed!")
-        print(f"Processed {stats['total_urls']} URLs")
-        print(f"Success: {stats['successful_crawls']}, Failed: {stats['failed_crawls']}, Skipped: {stats['skipped_urls']}")
+        print(f"URLs processed: {stats['processed_urls']} (max: {engine.max_urls})")
+        print(f"Success: {stats['successful_crawls']}, Failed: {stats['failed_crawls']}")
+        print(f"Skipped (already crawled): {stats['skipped_urls']}, Non-crawlable: {stats['non_crawlable_urls']}")
 
 if __name__ == "__main__":
     main()
