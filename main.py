@@ -1,5 +1,7 @@
+import json
 import logging
-from product_crawler import crawl_urls
+from product_crawler import ProductCrawler
+from modules.crawler_engine import CrawlerEngine
 
 # Configure logging
 logging.basicConfig(
@@ -13,11 +15,29 @@ logging.basicConfig(
 
 def main():
     """Main entry point for the crawler application"""
-    urls = [
-        "https://artisankala.com/%D9%84%D9%85%D9%8A%D9%86%D8%AA-cs7"
-    ]
+    urls = []
+    with open('sitemap.json') as f:
+        urls = json.load(f)
+    
     if urls:
-        crawl_urls(urls)
+        # Create product crawler instance
+        product_crawler = ProductCrawler()
+        
+        # Create and configure crawler engine
+        engine = CrawlerEngine(
+            crawler_service=product_crawler,
+            delay_seconds=0.5,  # Configurable delay between requests
+            max_urls=100,       # Maximum number of URLs to crawl
+            stop_on_error=False # Whether to stop on first error
+        )
+        
+        # Run crawling process
+        stats = engine.crawl_urls(urls)
+        
+        # Print summary
+        print("\nCrawling completed!")
+        print(f"Processed {stats['total_urls']} URLs")
+        print(f"Success: {stats['successful_crawls']}, Failed: {stats['failed_crawls']}, Skipped: {stats['skipped_urls']}")
 
 if __name__ == "__main__":
     main()

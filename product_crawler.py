@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,6 +9,7 @@ from urllib.parse import urlparse
 from modules.datastore import product_repo, image_repo, failed_crawl_repo, variation_repo
 from modules.utils import formatters
 from modules.utils.incremental_id_generator import IncrementalIdGenerator
+from modules.crawler_interface import CrawlerInterface
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +26,7 @@ IMAGES_DIR = "data/images"
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
-class ProductCrawler:
+class ProductCrawler(CrawlerInterface):
     def __init__(self):
         self.browser = None
         self.context = None
@@ -280,16 +280,3 @@ class ProductCrawler:
                 status="failed"
             )
             return None
-
-
-def crawl_urls(urls):
-    """Crawl a list of URLs and save product data"""
-    crawler = ProductCrawler()
-    crawler.initialize()
-
-    for url in urls:
-        if crawler.not_crawled_before(url):
-            crawler.crawl_url(url)
-            time.sleep(0.2)
-
-    crawler.close()
