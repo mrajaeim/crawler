@@ -37,10 +37,12 @@ class CrawlerEngine:
             "successful_crawls": 0,
             "failed_crawls": 0,
             "skipped_urls": 0,
+            "non_crawlable_urls": 0,
             "start_time": None,
             "end_time": None,
             "crawled_urls": [],
-            "failed_urls": []
+            "failed_urls": [],
+            "non_crawlable_found": []
         }
     
     def initialize(self) -> None:
@@ -76,6 +78,13 @@ class CrawlerEngine:
                 logging.info(f"Limiting crawl to first {self.max_urls} URLs out of {len(urls)}")
             
             for url in urls_to_crawl:
+                # Check if URL is marked as non-crawlable
+                if self.crawler_service.is_non_crawlable_url(url):
+                    self.stats["non_crawlable_urls"] += 1
+                    logging.info(f"Skipping non-crawlable URL: {url}")
+                    continue
+                
+                # Check if URL has been crawled before
                 if self.crawler_service.not_crawled_before(url):
                     # Crawl the URL
                     result = self.crawler_service.crawl_url(url)
@@ -85,13 +94,19 @@ class CrawlerEngine:
                         self.stats["crawled_urls"].append(url)
                         logging.info(f"Successfully crawled URL: {url}")
                     else:
-                        self.stats["failed_crawls"] += 1
-                        self.stats["failed_urls"].append(url)
-                        logging.warning(f"Failed to crawl URL: {url}")
-                        
-                        if self.stop_on_error:
-                            logging.warning("Stopping crawl due to error (stop_on_error=True)")
-                            break
+                        # Check if URL was marked as non-crawlable during crawling
+                        if self.crawler_service.is_non_crawlable_url(url):
+                            self.stats["non_crawlable_urls"] += 1
+                            self.stats["non_crawlable_found"].append(url)
+                            logging.info(f"URL marked as non-crawlable during crawl: {url}")
+                        else:
+                            self.stats["failed_crawls"] += 1
+                            self.stats["failed_urls"].append(url)
+                            logging.warning(f"Failed to crawl URL: {url}")
+                            
+                            if self.stop_on_error:
+                                logging.warning("Stopping crawl due to error (stop_on_error=True)")
+                                break
                 else:
                     self.stats["skipped_urls"] += 1
                     logging.info(f"Skipping already crawled URL: {url}")
@@ -120,7 +135,8 @@ class CrawlerEngine:
         logging.info(f"Total URLs: {self.stats['total_urls']}")
         logging.info(f"Successful crawls: {self.stats['successful_crawls']}")
         logging.info(f"Failed crawls: {self.stats['failed_crawls']}")
-        logging.info(f"Skipped URLs: {self.stats['skipped_urls']}")
+        logging.info(f"Skipped URLs (already crawled): {self.stats['skipped_urls']}")
+        logging.info(f"Non-crawlable URLs: {self.stats['non_crawlable_urls']}")
         
         runtime = self.stats.get("runtime_seconds", 0)
         runtime_mins = int(runtime // 60)

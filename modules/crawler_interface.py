@@ -25,6 +25,16 @@ class CrawlerInterface(ABC):
         pass
     
     @abstractmethod
+    def is_non_crawlable_url(self, url: str) -> bool:
+        """Check if the URL has been marked as non-crawlable (not a product or image)"""
+        pass
+    
+    @abstractmethod
+    def add_non_crawlable_url(self, url: str, url_type: str, reason: str = None) -> None:
+        """Add a URL to the non-crawlable list"""
+        pass
+    
+    @abstractmethod
     def crawl_url(self, url: str) -> Optional[Union[str, int]]:
         """
         Crawl a specific URL and process its content

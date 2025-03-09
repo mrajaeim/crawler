@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from urllib.parse import urlparse
-from modules.datastore import product_repo, image_repo, failed_crawl_repo, variation_repo
+from modules.datastore import product_repo, image_repo, failed_crawl_repo, variation_repo, non_crawlable_url_repo
 from modules.utils import formatters
 from modules.utils.incremental_id_generator import IncrementalIdGenerator
 from modules.crawler_interface import CrawlerInterface
@@ -54,9 +54,23 @@ class ProductCrawler(CrawlerInterface):
             case _:
                 raise ValueError(f"Unsupported url type: {url_type}")
 
+    def is_non_crawlable_url(self, url: str) -> bool:
+        """Check if the URL has been marked as non-crawlable"""
+        return non_crawlable_url_repo.is_non_crawlable_url(url)
+
+    def add_non_crawlable_url(self, url: str, url_type: str, reason: str = None) -> None:
+        """Add a URL to the non-crawlable list"""
+        non_crawlable_url_repo.create_non_crawlable_url(url, url_type, reason)
+        logging.info(f"Added URL to non-crawlable list: {url} (Type: {url_type}, Reason: {reason})")
+
     def crawl_url(self, url):
         """Crawl a specific URL and extract product information"""
         try:
+            # Check if URL is marked as non-crawlable
+            if self.is_non_crawlable_url(url):
+                logging.info(f"Skipping non-crawlable URL: {url}")
+                return None
+
             logging.info(f"Crawling URL: {url}")
             self.page.goto(url, wait_until="networkidle")
 
@@ -67,6 +81,8 @@ class ProductCrawler(CrawlerInterface):
             # Check if it's a product page
             if not self._is_product_page(soup):
                 logging.info(f"Not a product page: {url}")
+                # Mark as non-crawlable to prevent future crawling attempts
+                self.add_non_crawlable_url(url, "page", reason="Not a product page")
                 return None
 
             # Extract product information
