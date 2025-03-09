@@ -7,17 +7,16 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from urllib.parse import urlparse
-from modules.db import product_repo, image_repo, failed_crawl_repo
+from modules.datastore import product_repo, image_repo, failed_crawl_repo, variation_repo
 from modules.utils import formatters
 from modules.utils.incremental_id_generator import IncrementalIdGenerator
-from modules.datastore.variation_repository import VariationRepository
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("crawler.log"),
+        logging.FileHandler("crawler.log", encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -33,7 +32,6 @@ class ProductCrawler:
         self.context = None
         self.page = None
         self.untitled_image_id_generator = IncrementalIdGenerator()
-        self.variation_repo = VariationRepository("data/crawler.db")
 
     def initialize(self):
         """Initialize the Playwright browser"""
@@ -141,9 +139,15 @@ class ProductCrawler:
                 has_variations=has_variations
             )
 
-            # Save main product image if available
-            if product_data['product_image_url'] and self.not_crawled_before(product_data['product_image_url'],
-                                                                             url_type="image"):
+            # Save product images
+            # Check if we have multiple images in a gallery
+            if 'product_gallery_images' in product_data and product_data['product_gallery_images']:
+                # Save all gallery images
+                for image_url in product_data['product_gallery_images']:
+                    if image_url and self.not_crawled_before(image_url, url_type="image"):
+                        self._save_image(product_id, image_url)
+            # If no gallery images but we have a main image, save that
+            elif product_data['product_image_url'] and self.not_crawled_before(product_data['product_image_url'], url_type="image"):
                 self._save_image(product_id, product_data['product_image_url'])
 
             # Process variations if present
@@ -171,7 +175,7 @@ class ProductCrawler:
         for variation in variations:
             try:
                 # Create variation record
-                variation_id = self.variation_repo.create_variation(
+                variation_id = variation_repo.create_variation(
                     product_id=parent_product_id,
                     variation_code=variation['code']
                 )
@@ -186,7 +190,7 @@ class ProductCrawler:
 
                     # Update variation with image ID
                     if image_id:
-                        self.variation_repo.update_variation(
+                        variation_repo.update_variation(
                             variation_id=variation_id,
                             image_id=image_id
                         )
